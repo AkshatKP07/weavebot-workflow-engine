@@ -1,0 +1,57 @@
+// backend/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  name        String?
+  workflows   Workflow[]
+  credentials Credential[]
+  createdAt   DateTime     @default(now())
+}
+
+model Workflow {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  graph       Json         // Stores the React Flow nodes and edges
+  isActive    Boolean      @default(false)
+  isTemplate  Boolean      @default(false) // For the "Discover" marketplace
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions  Execution[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Credential {
+  id           String   @id @default(uuid())
+  provider     String   // e.g., "gmail", "discord", "notion"
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, provider]) // One provider per user
+}
+
+model Execution {
+  id           String    @id @default(uuid())
+  workflowId   String
+  workflow     Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  status       String    // "PENDING", "RUNNING", "COMPLETED", "FAILED"
+  triggerData  Json?     // The initial webhook payload
+  resultData   Json?     // The final output
+  logs         Json?     // Array of individual node execution times/errors
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+}
