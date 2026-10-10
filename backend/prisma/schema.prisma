@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String       @id // Removed @default(uuid()) to store the Clerk ID directly
+  email            String       @unique
+  name             String?
+  stripeCustomerId String?      @unique // Added for future SaaS billing
+  workflows        Workflow[]
+  credentials      Credential[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Workflow {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  graph       Json        // Stores the React Flow nodes and edges
+  webhookSlug String?     @unique // Unique path parameter (e.g., /webhook/your-slug)
+  isActive    Boolean     @default(false)
+  isTemplate  Boolean     @default(false)
+  version     Int         @default(1) // Tracks iterations of the canvas
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions  Execution[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Credential {
+  id           String    @id @default(uuid())
+  provider     String    // e.g., "gmail", "discord", "notion"
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt // Critical for tracking token refresh cycles
+
+  @@unique([userId, provider])
+}
+
+model Execution {
+  id           String    @id @default(uuid())
+  workflowId   String
+  workflow     Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  status       String    // "PENDING", "RUNNING", "COMPLETED", "FAILED"
+  triggerData  Json?     // The initial webhook payload
+  resultData   Json?     // The final output
+  logs         Json?     // Array of individual node execution times/errors
+  errorDetails String?   // Dedicated field for high-level workflow crashes
+  failedNodeId String?   // Tracks exactly which node on the canvas broke
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+}
+
+// 3. Add the Vector Database model
+model Document {
+  id        String                 @id @default(uuid())
+  content   String
+  embedding Unsupported("vector(768)") // Gemini embeddings are always 768 dimensions
+  createdAt DateTime               @default(now())
+}

@@ -1,0 +1,34 @@
+# =========================
+# Node & Dependencies
+# =========================
+node_modules/
+npm-debug.log
+
+# =========================
+# Environment Variables (CRITICAL)
+# =========================
+.env
+.env.*
+*.pem
+
+# =========================
+# Databases & Prisma
+# =========================
+*.db
+*.db-journal
+backend/dev.db
+backend/prisma/dev.db
+
+# =========================
+# Build Outputs (Vite/React)
+# =========================
+dist/
+build/
+clean-workflow-engine/dist/
+
+# =========================
+# OS & Editor Files
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
