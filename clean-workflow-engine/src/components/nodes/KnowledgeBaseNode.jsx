@@ -2,7 +2,8 @@ import { Handle, Position } from '@xyflow/react';
 import { Database } from 'lucide-react';
 
 export default function KnowledgeBaseNode({ data, selected }) {
-  const databaseId = data?.databaseId || 'mock_db';
+  const databaseId = data?.databaseId || 'default';
+  const provider = data?.provider || 'gemini';
   const outputKey = data?.outputKey || 'kb_context';
 
   return (
@@ -19,7 +20,9 @@ export default function KnowledgeBaseNode({ data, selected }) {
         </div>
         <div className="overflow-hidden">
           <h4 className="font-semibold text-xs text-slate-800 truncate">Knowledge Base</h4>
-          <p className="text-[10px] text-slate-400 truncate mt-0.5">Search: {databaseId}</p>
+          <p className="text-[10px] text-slate-400 truncate mt-0.5 capitalize">
+            {provider} · {databaseId}
+          </p>
         </div>
       </div>
 

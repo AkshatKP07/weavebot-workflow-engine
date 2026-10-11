@@ -63,8 +63,11 @@ model Execution {
 
 // 3. Add the Vector Database model
 model Document {
-  id        String                 @id @default(uuid())
-  content   String
-  embedding Unsupported("vector(768)") // Gemini embeddings are always 768 dimensions
-  createdAt DateTime               @default(now())
+  id         String   @id @default(uuid())
+  userId     String   @default("system") // <-- Added default value here
+  databaseId String   @default("default")
+  title      String?
+  content    String
+  embedding  Unsupported("vector(768)")?
+  createdAt  DateTime @default(now())
 }

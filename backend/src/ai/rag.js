@@ -1,5 +1,6 @@
-// backend/src/ai/rag.js
 import { prisma } from '../config/db.js';
+import { randomUUID } from 'crypto';
+
 
 // 1. Universal Embedding Router (BYOK)
 export async function generateEmbedding({ text, provider = 'gemini', apiKey, baseUrl }) {
@@ -45,7 +46,7 @@ export async function generateEmbedding({ text, provider = 'gemini', apiKey, bas
       body: JSON.stringify({
         input: text,
         model: "text-embedding-3-small", 
-        dimensions: 768 // Forces OpenAI-compatible APIs to output exactly 768 dimensions
+        dimensions: 768 
       })
     });
 
@@ -57,17 +58,18 @@ export async function generateEmbedding({ text, provider = 'gemini', apiKey, bas
   throw new Error(`Unsupported embedding provider: ${provider}`);
 }
 
-// 2. Query the Knowledge Base (Now receives dynamic credentials)
-export async function queryKnowledgeBase({ queryText, maxChunks = 2, provider = 'gemini', apiKey, baseUrl }) {
+// 2. Query the Knowledge Base (Now receives dynamic credentials and Tenant ID)
+export async function queryKnowledgeBase({ queryText, maxChunks = 2, provider = 'gemini', apiKey, baseUrl, userId, databaseId }) {
   console.log(`🔍 [RAG] Searching Supabase for: "${queryText.substring(0, 30)}..."`);
   
   const queryVector = await generateEmbedding({ text: queryText, provider, apiKey, baseUrl });
   const vectorString = `[${queryVector.join(',')}]`;
 
-  // Note: For production multi-tenancy, add a `WHERE "userId" = ${userId}` clause here
+  // STRICT MULTI-TENANCY: Only search documents belonging to this user and this specific database
   const results = await prisma.$queryRaw`
     SELECT content, 1 - (embedding <=> ${vectorString}::vector) as score
     FROM "Document"
+    WHERE "userId" = ${userId} AND "databaseId" = ${databaseId}
     ORDER BY embedding <=> ${vectorString}::vector ASC
     LIMIT ${maxChunks};
   `;
@@ -76,48 +78,17 @@ export async function queryKnowledgeBase({ queryText, maxChunks = 2, provider = 
   return { retrievedContext, matches: results };
 }
 
-// 3. Seed the database (Gracefully fails if run in CI/CD without a test key)
-export async function seedMockDatabase(testApiKey, provider = 'gemini') {
-  console.log("🌱 [RAG] Seeding Supabase pgvector database...");
-  if (!testApiKey) {
-    console.warn("⚠️ [RAG] Skipping seed: No developer API key provided for embeddings.");
-    return;
-  }
-
-  const documents = [
-    { id: "doc1", text: "Company Policy: All employees get 20 days of paid time off per year." },
-    { id: "doc2", text: "Engineering: The backend API rate limit is 100 requests per minute per user." },
-    { id: "doc3", text: "HR: The CEO of the company is Jane Doe. The CTO is John Smith." }
-  ];
-
-  for (const doc of documents) {
-    try {
-      const exists = await prisma.document.findUnique({ where: { id: doc.id } });
-      if (exists) continue;
-
-      const embedding = await generateEmbedding({ text: doc.text, provider, apiKey: testApiKey });
-      const vectorString = `[${embedding.join(',')}]`;
-
-      await prisma.$executeRaw`
-        INSERT INTO "Document" (id, content, embedding)
-        VALUES (${doc.id}, ${doc.text}, ${vectorString}::vector)
-      `;
-    } catch (error) {
-      console.error("Failed to seed doc:", doc.id, error.message);
-    }
-  }
-  console.log(`✅ [RAG] Supabase vector database ready.`);
-}
-
-// 4. Insert vectors from the frontend UI
+// 3. Insert vectors from the frontend UI
+// 3. Insert vectors from the frontend UI
 export async function insertDocumentVectors(documents) {
   for (const doc of documents) {
-    // Convert the raw array into a formatted pgvector string
     const vectorString = `[${doc.embedding.join(',')}]`;
+    const newId = randomUUID(); // Generate the UUID manually for the raw query
     
     await prisma.$executeRaw`
-      INSERT INTO "Document" ("userId", "databaseId", "title", "content", "embedding", "createdAt")
+      INSERT INTO "Document" ("id", "userId", "databaseId", "title", "content", "embedding", "createdAt")
       VALUES (
+        ${newId},
         ${doc.userId},
         ${doc.databaseId},
         ${doc.title},

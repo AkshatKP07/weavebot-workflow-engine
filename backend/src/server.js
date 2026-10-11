@@ -4,23 +4,39 @@ import cors from 'cors';
 import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
 
 import { ENV } from './config/env.js';
-import { seedMockDatabase } from './ai/rag.js';
 
 // Import Routers
 import workflowsRouter from './routes/workflows.js';
 import marketplaceRouter from './routes/marketplace.js';
 import credentialsRouter from './routes/credentials.js';
 import webhooksRouter from './routes/webhooks.js';
-import knowledgeRouter from './routes/knowledge.js';
+import knowledgeRouter from './routes/knowledge.js'; // FIXED: Added missing import
 
 import './worker/executor.js';
 
 const app = express();
 
+// Production-ready CORS: Allows localhost in dev, and matches your Vercel deployment URL
 app.use(cors({
-  origin: 'http://localhost:5173', // Your Vite frontend URL
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, or webhook posts)
+    if (!origin) return callback(null, true);
+    
+    const allowed = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+
+    // Also automatically allow any *.vercel.app deployment preview
+    if (allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    return callback(new Error('Blocked by CORS policy'));
+  },
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization'] // Explicitly allow Clerk tokens
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // 1. SECURITY ARMOR: Strict 1MB payload limit (Prevents OOM Poison Pills)
@@ -67,8 +83,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Boot Server
-app.listen(ENV.PORT, async () => {
+// Boot Server (Removed seedMockDatabase call)
+app.listen(ENV.PORT, () => {
   console.log(`🚀 API & Background Worker running on port ${ENV.PORT}`);
-  await seedMockDatabase();
 });

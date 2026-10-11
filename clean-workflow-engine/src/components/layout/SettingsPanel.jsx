@@ -35,7 +35,6 @@ export default function SettingsPanel() {
     );
   }
 
-  // --- GRAPH TRAVERSAL MAGIC ---
   const getUpstreamNodes = (targetId, visited = new Set()) => {
     let upstream = [];
     const incomingEdges = edges.filter((e) => e.target === targetId);
@@ -55,7 +54,6 @@ export default function SettingsPanel() {
 
   const upstreamNodes = getUpstreamNodes(selectedNode.id);
 
-  // --- VARIABLE PILL UI COMPONENT ---
   const renderVariablePills = (fieldKey) => {
     if (upstreamNodes.length === 0) return null;
 
@@ -98,7 +96,6 @@ export default function SettingsPanel() {
     setTestLoading(true);
     setTestResult(null);
     try {
-      // Realistic simulation / test preview
       await new Promise((resolve) => setTimeout(resolve, 650));
       setTestResult({
         status: 'success',
@@ -121,7 +118,6 @@ export default function SettingsPanel() {
     }
   };
 
-  // Reusable Output Variable Input Block
   const renderOutputKeyField = (defaultKey) => {
     const currentKey = selectedNode.data.outputKey || defaultKey;
     return (
@@ -151,6 +147,8 @@ export default function SettingsPanel() {
       </div>
     );
   };
+
+  const currentKbProvider = selectedNode.data.provider || 'gemini';
 
   return (
     <>
@@ -357,6 +355,32 @@ export default function SettingsPanel() {
           {/* KNOWLEDGE BASE NODE */}
           {selectedNode.type === 'knowledge_base' && (
             <div className="flex flex-col gap-3">
+              {/* Provider Selection */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Embedding Provider</label>
+                <select
+                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:border-teal-500 focus:outline-none bg-white font-medium"
+                  value={currentKbProvider}
+                  onChange={(e) => updateNodeData(selectedNode.id, { provider: e.target.value })}
+                >
+                  <option value="gemini">Google Gemini</option>
+                  <option value="universal">Universal (OpenAI / Local)</option>
+                </select>
+              </div>
+
+              {currentKbProvider === 'universal' && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Base URL (Optional)</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-md p-2 text-xs focus:border-teal-500 focus:outline-none font-mono"
+                    value={selectedNode.data.baseUrl || ''} 
+                    onChange={(e) => updateNodeData(selectedNode.id, { baseUrl: e.target.value })}
+                    placeholder="https://api.openai.com/v1"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Search Query / Prompt</label>
                 {renderVariablePills('query')}
@@ -381,14 +405,13 @@ export default function SettingsPanel() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Database ID</label>
-                  <select
-                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:border-teal-500 focus:outline-none"
-                    value={selectedNode.data.databaseId || 'mock_db'}
-                    onChange={(e) => updateNodeData(selectedNode.id, { databaseId: e.target.value, label: 'Document Store' })}
-                  >
-                    <option value="mock_db">Test Database</option>
-                    <option value="db_1">Employee Docs</option>
-                  </select>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:border-teal-500 focus:outline-none font-mono"
+                    value={selectedNode.data.databaseId || 'default'}
+                    onChange={(e) => updateNodeData(selectedNode.id, { databaseId: e.target.value })}
+                    placeholder="default"
+                  />
                 </div>
               </div>
 
@@ -398,12 +421,12 @@ export default function SettingsPanel() {
               <div className="border-t border-slate-100 pt-3 mt-2">
                 <label className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-teal-500" />
-                  <span>Save Embedding API Key</span>
+                  <span>Save Embedding Key for {currentKbProvider}</span>
                 </label>
                 <input
                   type="password"
                   className="w-full border border-slate-300 rounded p-1.5 text-xs mb-2 font-mono"
-                  placeholder={`Enter ${selectedNode.data.provider || 'gemini'} key...`}
+                  placeholder={`Enter ${currentKbProvider} key...`}
                   value={credInput}
                   onChange={(e) => setCredInput(e.target.value)}
                 />
@@ -411,7 +434,7 @@ export default function SettingsPanel() {
                   type="button"
                   onClick={async () => {
                     if (!credInput.trim()) return alert('Please enter a valid key.');
-                    await handleSaveCredential(selectedNode.data.provider || 'gemini', { apiKey: credInput.trim() });
+                    await handleSaveCredential(currentKbProvider, { apiKey: credInput.trim() });
                     setCredInput('');
                   }}
                   className="w-full bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-1.5 px-3 rounded transition-colors"
@@ -436,7 +459,6 @@ export default function SettingsPanel() {
           {/* SUPERCHARGED INTEGRATION NODE */}
           {selectedNode.type === 'integration' && (
             <div className="flex flex-col gap-3">
-              {/* Provider Selection */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Select App</label>
                 <select
@@ -463,7 +485,6 @@ export default function SettingsPanel() {
                 </select>
               </div>
 
-              {/* Action Selection */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Action Event</label>
                 <select
@@ -499,7 +520,7 @@ export default function SettingsPanel() {
                 </select>
               </div>
 
-              {/* DISCORD CONFIGURATION */}
+              {/* DISCORD */}
               {(selectedNode.data.provider || 'discord') === 'discord' && (
                 <>
                   <div>
@@ -549,7 +570,7 @@ export default function SettingsPanel() {
                 </>
               )}
 
-              {/* SLACK CONFIGURATION */}
+              {/* SLACK */}
               {selectedNode.data.provider === 'slack' && (
                 <>
                   <div>
@@ -600,7 +621,7 @@ export default function SettingsPanel() {
                 </>
               )}
 
-              {/* EMAIL CONFIGURATION */}
+              {/* EMAIL */}
               {selectedNode.data.provider === 'email' && (
                 <>
                   <div>
@@ -662,7 +683,7 @@ export default function SettingsPanel() {
                 </>
               )}
 
-              {/* CUSTOM API CONFIGURATION */}
+              {/* CUSTOM API */}
               {selectedNode.data.provider === 'custom_api' && (
                 <>
                   <div>
@@ -713,10 +734,8 @@ export default function SettingsPanel() {
                 </>
               )}
 
-              {/* Output Variable Identifier */}
               {renderOutputKeyField('integration_result')}
 
-              {/* TEST STEP SANDBOX */}
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mt-1">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-slate-700">Test Action Sandbox</span>
@@ -760,7 +779,6 @@ export default function SettingsPanel() {
             </div>
           )}
 
-          {/* DEBUG INFO */}
           <div className="text-[10px] text-gray-400 mt-4 bg-gray-50 p-2 rounded">
             ID: {selectedNode.id} | Type: {selectedNode.type}
           </div>

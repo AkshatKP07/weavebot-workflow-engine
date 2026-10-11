@@ -265,7 +265,8 @@ export const worker = new Worker('workflow-queue', async (job) => {
       
       const databaseId = node.data?.databaseId || 'mock_db';
       const maxChunks = node.data?.maxChunks || 2;
-      const provider = node.data?.provider || 'openai'; 
+   
+      const provider = node.data?.provider || 'gemini';
       const baseUrl = node.data?.baseUrl;
       
       console.log(`📚 [WORKER] Querying Knowledge Base -> ${databaseId}`);
@@ -281,7 +282,16 @@ export const worker = new Worker('workflow-queue', async (job) => {
           catch { apiKey = decrypt(savedCred.accessToken); }
         }
 
-        const ragResult = await queryKnowledgeBase({ queryText, maxChunks, provider, apiKey, baseUrl });
+      
+        const ragResult = await queryKnowledgeBase({ 
+          queryText, 
+          maxChunks, 
+          provider, 
+          apiKey, 
+          baseUrl,
+          userId: workflow.userId,
+          databaseId: databaseId
+        });
         
         executionContext[outputKey] = ragResult;
         stepResults[node.id] = ragResult;
@@ -416,3 +426,4 @@ export const worker = new Worker('workflow-queue', async (job) => {
 
 worker.on('completed', (job) => console.log(`✅ [WORKER] Job ${job.id} completed successfully!`));
 worker.on('failed', (job, error) => console.error(`❌ [WORKER] Job ${job.id} failed:`, error));
+export { assertPublicUrl, compileTemplate };

@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { apiClient } from '../../api/client';
 
 export default function AddKnowledgeModal({ isOpen, onClose, onIndexed }) {
-  const { getToken } = useAuth();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [databaseId] = useState('default');
+  const [databaseId, setDatabaseId] = useState('default');
+  const [provider, setProvider] = useState('gemini');
+  const [baseUrl, setBaseUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -17,25 +18,20 @@ export default function AddKnowledgeModal({ isOpen, onClose, onIndexed }) {
     setError(null);
 
     try {
-      const token = await getToken();
-      const res = await fetch('http://localhost:3001/api/knowledge/documents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ title, content, databaseId })
+      const data = await apiClient.indexKnowledgeDocument({
+        title,
+        content,
+        databaseId,
+        provider,
+        baseUrl: provider === 'universal' ? baseUrl : undefined
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
 
       setTitle('');
       setContent('');
       if (onIndexed) onIndexed(data);
       onClose();
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to index document.');
     } finally {
       setLoading(false);
     }
@@ -48,7 +44,7 @@ export default function AddKnowledgeModal({ isOpen, onClose, onIndexed }) {
     setTitle(file.name.replace(/\.[^/.]+$/, ''));
     const reader = new FileReader();
     reader.onload = (event) => setContent(event.target.result);
-    reader.readAsText(file); // Reads .txt, .md, .csv, or raw text files
+    reader.readAsText(file);
   };
 
   return (
@@ -63,9 +59,52 @@ export default function AddKnowledgeModal({ isOpen, onClose, onIndexed }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
+                Embedding Provider
+              </label>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+              >
+                <option value="gemini">Google Gemini</option>
+                <option value="universal">Universal (OpenAI / Local)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
+                Target Database ID
+              </label>
+              <input
+                type="text"
+                value={databaseId}
+                onChange={(e) => setDatabaseId(e.target.value)}
+                placeholder="default"
+                className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 font-mono"
+              />
+            </div>
+          </div>
+
+          {provider === 'universal' && (
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
+                Base URL (Optional)
+              </label>
+              <input
+                type="text"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="https://api.openai.com/v1"
+                className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 font-mono"
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
-              Import from File (.txt, .md)
+              Import from File (.txt, .md, .csv)
             </label>
             <input
               type="file"
@@ -95,7 +134,7 @@ export default function AddKnowledgeModal({ isOpen, onClose, onIndexed }) {
             </label>
             <textarea
               required
-              rows={6}
+              rows={5}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Paste raw company info, internal docs, or guidelines here..."

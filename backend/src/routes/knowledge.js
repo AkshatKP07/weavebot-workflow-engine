@@ -5,7 +5,6 @@ import { generateEmbedding, insertDocumentVectors } from '../ai/rag.js';
 
 const router = express.Router();
 
-// Helper: Split long texts into overlapping chunks
 function chunkText(text, chunkSize = 500, overlap = 50) {
   const words = text.split(/\s+/);
   const chunks = [];
@@ -19,35 +18,31 @@ function chunkText(text, chunkSize = 500, overlap = 50) {
   return chunks;
 }
 
-// POST /api/knowledge/documents - Add custom text/document
 router.post('/documents', async (req, res) => {
   try {
-    const { title, content, databaseId = 'default' } = req.body;
+    const { title, content, databaseId = 'default', provider = 'gemini', baseUrl } = req.body;
     const userId = req.auth.userId;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ error: 'Document content is required.' });
     }
 
-    // 1. Fetch user's embedding API key from vault
     const credential = await prisma.credential.findUnique({
-      where: { userId_provider: { userId, provider: 'gemini' } }
+      where: { userId_provider: { userId, provider } }
     });
 
     if (!credential) {
-      return res.status(400).json({ error: 'Please save a Gemini API key in the vault first.' });
+      return res.status(400).json({ error: `Please save your ${provider} API key in the credentials vault first.` });
     }
 
     const parsedCred = JSON.parse(decrypt(credential.accessToken));
     const apiKey = parsedCred.apiKey || parsedCred;
 
-    // 2. Chunk text to ensure search accuracy
     const chunks = chunkText(content);
     const recordsToInsert = [];
 
-    // 3. Generate embeddings for each chunk
     for (const [index, chunk] of chunks.entries()) {
-      const vector = await generateEmbedding({ text: chunk, apiKey });
+      const vector = await generateEmbedding({ text: chunk, provider, apiKey, baseUrl });
       recordsToInsert.push({
         userId,
         databaseId,
@@ -57,13 +52,12 @@ router.post('/documents', async (req, res) => {
       });
     }
 
-    // 4. Save vectors to Supabase pgvector
     await insertDocumentVectors(recordsToInsert);
 
     res.json({
       success: true,
       chunksCreated: recordsToInsert.length,
-      message: `Successfully indexed ${recordsToInsert.length} knowledge chunks.`
+      message: `Successfully indexed ${recordsToInsert.length} knowledge chunks using ${provider}.`
     });
   } catch (error) {
     console.error('❌ [RAG INGESTION ERROR]:', error);
